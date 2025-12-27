@@ -1,11 +1,15 @@
-import discord
 import os
+import discord
+from discord.ext import commands
 
 intents = discord.Intents.default()
-client = discord.Client(intents=intents)
+intents.message_content = True
 
-@client.event
+bot = commands.Bot(command_prefix="!", intents=intents)
+
+@bot.event
 async def on_ready():
-    print(f'Logged in as {client.user}')
+    print(f"Logged in as {bot.user}")
 
-client.run(os.getenv("TOKEN"))
+# Use token from Secrets
+bot.run(os.getenv("TOKEN"))
