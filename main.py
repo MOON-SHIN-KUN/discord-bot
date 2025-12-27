@@ -2,7 +2,6 @@ import os
 import discord
 from discord.ext import commands, tasks
 from discord import app_commands
-import random
 from datetime import datetime, timedelta
 
 # -------------------- BOT SETUP --------------------
@@ -33,91 +32,114 @@ async def on_ready():
     await bot.tree.sync(guild=guild)
     print(f"{bot.user} is online and slash commands synced in the server!")
 
+# -------------------- ERROR HANDLING --------------------
+@bot.tree.error
+async def on_app_command_error(interaction: discord.Interaction, error):
+    # Ignore missing permissions or command not found
+    from discord import app_commands
+    if isinstance(error, (app_commands.CommandNotFound, app_commands.CheckFailure)):
+        return
+    print(f"Error in slash command {interaction.command.name}: {error}")
+
 # -------------------- MODERATION COMMANDS --------------------
 @bot.tree.command(name="kick", description="Kick a member from the server")
 @app_commands.describe(member="User to kick", reason="Reason for kick")
 async def kick(interaction: discord.Interaction, member: discord.Member, reason: str = None):
-    if not interaction.user.guild_permissions.kick_members:
-        await interaction.response.send_message("❌ You don't have permission!", ephemeral=True)
-        return
-    await member.kick(reason=reason)
-    await interaction.response.send_message(f"⚡ {member.name} was kicked.")
-    await log_action(interaction.guild, f"⚡ {interaction.user.name} kicked {member.name}. Reason: {reason}")
+    try:
+        if not interaction.user.guild_permissions.kick_members:
+            await interaction.response.send_message("❌ You don't have permission!", ephemeral=True)
+            return
+        await member.kick(reason=reason)
+        await interaction.response.send_message(f"⚡ {member.name} was kicked.")
+        await log_action(interaction.guild, f"⚡ {interaction.user.name} kicked {member.name}. Reason: {reason}")
+    except Exception as e:
+        print(f"Kick command error: {e}")
 
 @bot.tree.command(name="ban", description="Ban a member from the server")
 @app_commands.describe(member="User to ban", reason="Reason for ban")
 async def ban(interaction: discord.Interaction, member: discord.Member, reason: str = None):
-    if not interaction.user.guild_permissions.ban_members:
-        await interaction.response.send_message("❌ You don't have permission!", ephemeral=True)
-        return
-    await member.ban(reason=reason)
-    await interaction.response.send_message(f"⚡ {member.name} was banned.")
-    await log_action(interaction.guild, f"⚡ {interaction.user.name} banned {member.name}. Reason: {reason}")
+    try:
+        if not interaction.user.guild_permissions.ban_members:
+            await interaction.response.send_message("❌ You don't have permission!", ephemeral=True)
+            return
+        await member.ban(reason=reason)
+        await interaction.response.send_message(f"⚡ {member.name} was banned.")
+        await log_action(interaction.guild, f"⚡ {interaction.user.name} banned {member.name}. Reason: {reason}")
+    except Exception as e:
+        print(f"Ban command error: {e}")
 
 @bot.tree.command(name="clear", description="Clear messages in a channel")
 @app_commands.describe(amount="Number of messages to delete")
 async def clear(interaction: discord.Interaction, amount: int):
-    if not interaction.user.guild_permissions.manage_messages:
-        await interaction.response.send_message("❌ You don't have permission!", ephemeral=True)
-        return
-    await interaction.channel.purge(limit=amount)
-    await interaction.response.send_message(f"🧹 Cleared {amount} messages!", ephemeral=True)
-    await log_action(interaction.guild, f"🧹 {interaction.user.name} cleared {amount} messages in #{interaction.channel.name}")
+    try:
+        if not interaction.user.guild_permissions.manage_messages:
+            await interaction.response.send_message("❌ You don't have permission!", ephemeral=True)
+            return
+        await interaction.channel.purge(limit=amount)
+        await interaction.response.send_message(f"🧹 Cleared {amount} messages!", ephemeral=True)
+        await log_action(interaction.guild, f"🧹 {interaction.user.name} cleared {amount} messages in #{interaction.channel.name}")
+    except Exception as e:
+        print(f"Clear command error: {e}")
 
 @bot.tree.command(name="mute", description="Mute a member temporarily")
 @app_commands.describe(member="User to mute", minutes="Minutes to mute", reason="Reason for mute")
 async def mute(interaction: discord.Interaction, member: discord.Member, minutes: int = 10, reason: str = None):
-    if not interaction.user.guild_permissions.manage_roles:
-        await interaction.response.send_message("❌ You don't have permission!", ephemeral=True)
-        return
-    mute_role = discord.utils.get(interaction.guild.roles, name="Muted")
-    if not mute_role:
-        mute_role = await interaction.guild.create_role(name="Muted")
-        for channel in interaction.guild.channels:
-            await channel.set_permissions(mute_role, speak=False, send_messages=False)
-    await member.add_roles(mute_role)
-    unmute_time = datetime.utcnow() + timedelta(minutes=minutes)
-    mutes[member.id] = unmute_time
-    await interaction.response.send_message(f"🔇 {member.name} muted for {minutes} minutes. Reason: {reason}")
-    await log_action(interaction.guild, f"🔇 {member.name} muted by {interaction.user.name} for {minutes} minutes. Reason: {reason}")
+    try:
+        if not interaction.user.guild_permissions.manage_roles:
+            await interaction.response.send_message("❌ You don't have permission!", ephemeral=True)
+            return
+        mute_role = discord.utils.get(interaction.guild.roles, name="Muted")
+        if not mute_role:
+            mute_role = await interaction.guild.create_role(name="Muted")
+            for channel in interaction.guild.channels:
+                await channel.set_permissions(mute_role, speak=False, send_messages=False)
+        await member.add_roles(mute_role)
+        unmute_time = datetime.utcnow() + timedelta(minutes=minutes)
+        mutes[member.id] = unmute_time
+        await interaction.response.send_message(f"🔇 {member.name} muted for {minutes} minutes. Reason: {reason}")
+        await log_action(interaction.guild, f"🔇 {member.name} muted by {interaction.user.name} for {minutes} minutes. Reason: {reason}")
+    except Exception as e:
+        print(f"Mute command error: {e}")
 
 @bot.tree.command(name="unmute", description="Unmute a member")
 @app_commands.describe(member="User to unmute")
 async def unmute(interaction: discord.Interaction, member: discord.Member):
-    if not interaction.user.guild_permissions.manage_roles:
-        await interaction.response.send_message("❌ You don't have permission!", ephemeral=True)
-        return
-    mute_role = discord.utils.get(interaction.guild.roles, name="Muted")
-    if mute_role in member.roles:
-        await member.remove_roles(mute_role)
-        await interaction.response.send_message(f"🔊 {member.name} has been unmuted.")
-        await log_action(interaction.guild, f"🔊 {member.name} was unmuted by {interaction.user.name}")
-        mutes.pop(member.id, None)
-    else:
-        await interaction.response.send_message("❌ User is not muted.", ephemeral=True)
+    try:
+        if not interaction.user.guild_permissions.manage_roles:
+            await interaction.response.send_message("❌ You don't have permission!", ephemeral=True)
+            return
+        mute_role = discord.utils.get(interaction.guild.roles, name="Muted")
+        if mute_role in member.roles:
+            await member.remove_roles(mute_role)
+            await interaction.response.send_message(f"🔊 {member.name} has been unmuted.")
+            await log_action(interaction.guild, f"🔊 {member.name} was unmuted by {interaction.user.name}")
+            mutes.pop(member.id, None)
+        else:
+            await interaction.response.send_message("❌ User is not muted.", ephemeral=True)
+    except Exception as e:
+        print(f"Unmute command error: {e}")
 
 # -------------------- REACTION ROLE SYSTEM --------------------
 @bot.tree.command(name="add_reaction_role", description="Add a reaction role to a message")
 @app_commands.describe(message_id="Message ID", emoji="Emoji to react", role_name="Role name to assign")
 async def add_reaction_role(interaction: discord.Interaction, message_id: int, emoji: str, role_name: str):
-    if not interaction.user.guild_permissions.manage_roles:
-        await interaction.response.send_message("❌ You don't have permission!", ephemeral=True)
-        return
     try:
+        if not interaction.user.guild_permissions.manage_roles:
+            await interaction.response.send_message("❌ You don't have permission!", ephemeral=True)
+            return
         message = await interaction.channel.fetch_message(message_id)
-    except:
-        await interaction.response.send_message("❌ Message not found.", ephemeral=True)
-        return
-    role = discord.utils.get(interaction.guild.roles, name=role_name)
-    if not role:
-        await interaction.response.send_message(f"❌ Role '{role_name}' not found!", ephemeral=True)
-        return
-    if message.id not in reaction_roles:
-        reaction_roles[message.id] = {}
-    reaction_roles[message.id][emoji] = role.name
-    await message.add_reaction(emoji)
-    await interaction.response.send_message(f"✅ Reaction role added: {emoji} -> {role.name}")
-    await log_action(interaction.guild, f"🛠 {interaction.user.name} added reaction role: {emoji} -> {role.name}")
+        role = discord.utils.get(interaction.guild.roles, name=role_name)
+        if not role:
+            await interaction.response.send_message(f"❌ Role '{role_name}' not found!", ephemeral=True)
+            return
+        if message.id not in reaction_roles:
+            reaction_roles[message.id] = {}
+        reaction_roles[message.id][emoji] = role.name
+        await message.add_reaction(emoji)
+        await interaction.response.send_message(f"✅ Reaction role added: {emoji} -> {role.name}")
+        await log_action(interaction.guild, f"🛠 {interaction.user.name} added reaction role: {emoji} -> {role.name}")
+    except Exception as e:
+        print(f"Add reaction role error: {e}")
 
 @bot.event
 async def on_raw_reaction_add(payload):
@@ -131,8 +153,11 @@ async def on_raw_reaction_add(payload):
         if role_name:
             role = discord.utils.get(guild.roles, name=role_name)
             if role:
-                await member.add_roles(role)
-                await log_action(guild, f"🛠 {member.name} received role {role.name} via reaction {emoji}")
+                try:
+                    await member.add_roles(role)
+                    await log_action(guild, f"🛠 {member.name} received role {role.name} via reaction {emoji}")
+                except:
+                    pass
 
 @bot.event
 async def on_raw_reaction_remove(payload):
@@ -146,21 +171,50 @@ async def on_raw_reaction_remove(payload):
         if role_name:
             role = discord.utils.get(guild.roles, name=role_name)
             if role:
-                await member.remove_roles(role)
-                await log_action(guild, f"🛠 {member.name} lost role {role.name} via reaction removal {emoji}")
+                try:
+                    await member.remove_roles(role)
+                    await log_action(guild, f"🛠 {member.name} lost role {role.name} via reaction removal {emoji}")
+                except:
+                    pass
 
-# -------------------- UTILITY & FUN SLASH COMMANDS --------------------
-@bot.tree.command(name="hello", description="Say hello in Solar System style")
-async def hello(interaction: discord.Interaction):
-    greetings = [
-        f"👋 Hello {interaction.user.name}! Welcome to the Solar System! 💖",
-        f"🌞 Hi {interaction.user.name}! Ready to shine in the system today?",
-        f"✨ Hey {interaction.user.name}! Orbiting around to say hello! 😄",
-        f"🌟 Greetings {interaction.user.name}! The Solar System welcomes you!"
-    ]
-    await interaction.response.send_message(random.choice(greetings))
+# -------------------- UTILITY COMMANDS --------------------
+@bot.tree.command(name="userinfo", description="Get user information")
+@app_commands.describe(member="User to get info about (optional)")
+async def userinfo(interaction: discord.Interaction, member: discord.Member = None):
+    member = member or interaction.user
+    await interaction.response.send_message(
+        f"👤 User Info:\n"
+        f"Name: {member.name}\n"
+        f"ID: {member.id}\n"
+        f"Joined: {member.joined_at}"
+    )
 
-# ... [Include all previous commands like /compliment, /mood, /orbit, /userinfo, /serverinfo, /choose, /poll here exactly as before] ...
+@bot.tree.command(name="serverinfo", description="Get server information")
+async def serverinfo(interaction: discord.Interaction):
+    guild = interaction.guild
+    await interaction.response.send_message(
+        f"🌐 Server Info:\n"
+        f"Name: {guild.name}\n"
+        f"Members: {guild.member_count}\n"
+        f"Created: {guild.created_at}"
+    )
+
+@bot.tree.command(name="choose", description="Choose from multiple options")
+@app_commands.describe(options="Provide options separated by space")
+async def choose(interaction: discord.Interaction, options: str):
+    opts = options.split()
+    if not opts:
+        await interaction.response.send_message("❌ No options provided!", ephemeral=True)
+    else:
+        await interaction.response.send_message(f"✅ I choose **{random.choice(opts)}**!")
+
+@bot.tree.command(name="poll", description="Create a poll")
+@app_commands.describe(question="Poll question")
+async def poll(interaction: discord.Interaction, question: str):
+    msg = await interaction.channel.send(f"📊 Poll: {question}\nReact with 👍 or 👎")
+    await msg.add_reaction("👍")
+    await msg.add_reaction("👎")
+    await interaction.response.send_message("✅ Poll created!", ephemeral=True)
 
 # -------------------- AUTOMATIC UNMUTE TASK --------------------
 @tasks.loop(seconds=30)
