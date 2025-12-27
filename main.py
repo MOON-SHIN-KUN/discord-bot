@@ -216,9 +216,16 @@ async def orbit(interaction: discord.Interaction):
     ]
     await interaction.response.send_message(f"{interaction.user.name} {random.choice(actions)}")
 
+# -------------------- HELLO / GREETINGS --------------------
 @bot.tree.command(name="hello", description="Say hello in Solar System style")
 async def hello(interaction: discord.Interaction):
-    await interaction.response.send_message(f"👋 Hello {interaction.user.name}! Welcome to the Solar System! 💖")
+    greetings = [
+        f"👋 Hello {interaction.user.name}! Welcome to the Solar System! 💖",
+        f"🌞 Hi {interaction.user.name}! Ready to shine in the system today?",
+        f"✨ Hey {interaction.user.name}! Orbiting around to say hello! 😄",
+        f"🌟 Greetings {interaction.user.name}! The Solar System welcomes you!"
+    ]
+    await interaction.response.send_message(random.choice(greetings))
 
 # -------------------- AUTOMATIC UNMUTE TASK --------------------
 @tasks.loop(seconds=30)
